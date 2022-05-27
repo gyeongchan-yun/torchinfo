@@ -46,6 +46,8 @@ class LayerInfo:
         self.kernel_size: List[int] = []
         self.num_params = 0
         self.macs = 0
+        self.params_mem = 0
+        self.output_mem = 0
 
     def __repr__(self) -> str:
         return f"{self.class_name}: {self.depth}"
@@ -116,7 +118,7 @@ class LayerInfo:
 
     def calculate_num_params(self) -> None:
         """
-        Set num_params, trainable, inner_layers, and kernel_size
+        Set num_params, trainable, inner_layers, and kernel_size, params_mem
         using the module's parameters.
         """
         name = ""
@@ -133,14 +135,25 @@ class LayerInfo:
                 self.kernel_size = ksize
 
             # RNN modules have inner weights such as weight_ih_l0
+            params_mem_val = round(param.nelement() * param.element_size() / (1024 ** 2), 3)
             self.inner_layers[name] = {
                 "kernel_size": str(ksize),
                 "num_params": f"├─{param.nelement():,}",
+                "params_mem": f"├─{params_mem_val:,}",
             }
         if self.inner_layers:
             self.inner_layers[name][
                 "num_params"
             ] = f"└─{self.inner_layers[name]['num_params'][2:]}"
+            params_mem_val = round(
+                int(self.inner_layers[name]['num_params'][2:].replace(',','')) * 4 / (1024 ** 2), 3)
+            self.inner_layers[name][
+                "params_mem"
+            ] = f"└─{params_mem_val}"
+
+    def calculate_output_mem(self) -> None:
+        if self.output_size and self.num_params > 0:
+            self.output_mem = round(prod(self.output_size) * 4 / (1024 ** 2), 2)
 
     def calculate_macs(self) -> None:
         """
@@ -198,6 +211,10 @@ class LayerInfo:
             return param_count_str if self.trainable_params else f"({param_count_str})"
         return "--"
 
+    def output_mem_to_str(self) -> str:
+        if self.is_leaf_layer and not self.is_recursive and self.num_params > 0:
+            return str(self.output_mem)
+        return "--"
 
 def prod(num_list: Union[Iterable[int], torch.Size]) -> int:
     result = 1

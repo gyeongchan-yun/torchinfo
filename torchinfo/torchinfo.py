@@ -40,7 +40,7 @@ CORRECTED_INPUT_DATA_TYPE = Optional[Union[Iterable[Any], Mapping[Any, Any]]]
 INPUT_SIZE_TYPE = Sequence[Union[int, Sequence[Any], torch.Size]]
 CORRECTED_INPUT_SIZE_TYPE = List[Union[Sequence[Any], torch.Size]]
 
-DEFAULT_COLUMN_NAMES = ("output_size", "num_params")
+DEFAULT_COLUMN_NAMES = ("output_size", "num_params", )
 DEFAULT_ROW_SETTINGS = ("depth",)
 
 _cached_forward_pass: Dict[str, List[LayerInfo]] = {}
@@ -169,6 +169,8 @@ def summary(
 
     if col_names is None:
         col_names = DEFAULT_COLUMN_NAMES if input_data_specified else ("num_params",)
+        if verbose == 2:
+            col_names += ("params_mem", "output_mem")
 
     if row_settings is None:
         row_settings = DEFAULT_ROW_SETTINGS
@@ -466,6 +468,7 @@ def apply_hooks(
         info.output_size = info.calculate_size(outputs, batch_dim)
         info.executed = True
         info.calculate_macs()
+        info.calculate_output_mem()
 
     submodules = [m for m in module.modules() if m is not orig_model]
     if module != orig_model or isinstance(module, LAYER_MODULES) or not submodules:
